@@ -155,7 +155,8 @@ const defaultConfig = {
 	},
 
 	"debug": {
-		"folderName": path.resolve(__dirname, "../logs")
+		"folderName": path.resolve(__dirname, "../logs"),
+		"logMaxSize": "10m"
 	},
 
 	"dataDir": path.resolve(__dirname, "../data"),
