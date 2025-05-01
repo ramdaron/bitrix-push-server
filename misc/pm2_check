@@ -1,0 +1,61 @@
+#!/bin/bash
+# test service in pm2
+#set -x
+
+export LC_ALL=""
+export LANG="en_US.UTF-8"
+export PATH=$PATH:/sbin:/usr/sbin:$HOME/bin
+
+PROGNAME=$(basename $0)
+PROGPATH=$(dirname $0)
+VERBOSE=0
+TEST=$(echo $PROGNAME| sed -e 's/\.sh$//')
+
+TMPDIR=/dev/shm
+[[ ! -d $TMPDIR ]] && TMPDIR=/tmp
+TMPFILE=$TMPDIR/${TEST}
+
+# print nagios info
+print_message() {
+  mess=$1
+  code=$2
+  perf=$3
+
+  notice=$(echo "$code" | sed -e 's/^0$/Ok/; s/^1$/Warning/; s/^2$/Critical/; s/^3$/Unknown/')
+  printf "%s: %s" "$notice" "$mess"
+  if [[ -n "$perf" ]]; then
+    echo "|$perf"
+  else
+    echo
+  fi
+
+  [[ -f $NAGIOS_TMP ]] && rm -f $NAGIOS_TMP
+  exit $code
+}
+
+service_status(){
+  
+  service_info=$(cat $TMPFILE | \
+   grep " $SERVICE ")
+
+  service_status=$(echo "$service_info" | awk '{print $10}')
+  service_status_code=3
+  [[ "$service_status" == "stopped" ]] && service_status_code=1
+  [[ "$service_status" == "error" ]] && service_status_code=2
+  [[ "$service_status" == "online" ]] && service_status_code=0
+
+  print_message "Service $SERVICE is $service_status" $service_status_code
+}
+
+SERVICE=$1
+[[ -z $SERVICE ]] && exit 1
+PM2_CMD=$(which pm2 2>/dev/null)
+[[ -z $PM2_CMD ]] && print_message "Not found pm2 utility (You must install it)" 3
+PM2_CMD="sudo $PM2_CMD --no-color status"
+
+$PM2_CMD >$TMPFILE 2>&1
+if [[ $? -gt 0 ]]; then
+  print_message "$PM2_CMD return error $(head -n1 $TMPFILE)" 2
+fi
+
+service_status

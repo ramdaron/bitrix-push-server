@@ -1,0 +1,58 @@
+#!/bin/bash
+# example
+# https://www.npmjs.com/package/pm2
+# https://github.com/Unitech/PM2/blob/development/ADVANCED_README.md#a890
+# install pm2:
+# npm install pm2 -g
+
+if [[ -f /etc/sysconfig/push-server ]]; then
+  . /etc/sysconfig/push-server
+fi
+
+[[ -z $EXEC_DIR ]] && EXEC_DIR=/opt/push-server     # location for project
+[[ -z $LOGS_DIR ]] && LOGS_DIR=/var/log/push-server # log files
+[[ -z $CONF_DIR ]] && CONF_DIR=/etc/push-server     # configs files
+
+[[ -z $SERVICE_NAME ]] && SERVICE_NAME=push-server              # name service for pm2 manager
+[[ -z $SERVICE_SCRIPT ]] && SERVICE_SCRIPT=server.js              # application script
+[[ -z $SERVICE_CONF ]] && SERVICE_CONF=$SERVICE_NAME.json       # config name
+
+# create service
+pm2 start --name $SERVICE_NAME \
+  --log $LOGS_DIR/service.log \
+  --output $LOGS_DIR/service.log \
+  --error $LOGS_DIR/service.err \
+  --pid /var/run/$SERVICE_NAME.pid \
+  --watch \
+  -i 4 \
+  $EXEC_DIR/$SERVICE_SCRIPT \
+  -- --config=$CONF_DIR/$SERVICE_CONF
+
+# generate init.d  script
+if [[ ! -f /etc/init.d/pm2-init.sh ]]; then
+  pm2 startup
+fi
+
+# save current process
+pm2 save
+
+# enable service
+chkconfig pm2-init.sh --add
+chkconfig pm2-init.sh on
+
+# logrotate config
+echo "$LOGS_DIR/*.log 
+$LOGS_DIR/*.err
+{
+  weekly
+  rotate 7
+  delaycompress
+  compress
+  notifempty
+  missingok
+  sharedscripts
+  postrotate
+    pm2 reloadLogs 2>/dev/null
+  endscript
+}" > /etc/logrotate.d/$SERVICE_NAME 
+

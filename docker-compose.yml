@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+   redis:
+     image: redis:latest
+
+   nodejs:
+     image: node:latest
+     working_dir: /usr/src/push-server
+     command: node server.js --config=/usr/src/push-server/config/config-docker.json
+     ports:
+        - "8895:1337"
+     volumes:
+        - .:/usr/src/push-server
+     depends_on:
+       - redis
